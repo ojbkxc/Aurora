@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Aurora</string>
+    <string name="xposed_module_name">Aurora</string>
+    <string name="xposed_description">微信AI自动回复机器人 - 支持DeepSeek/通义千问/智谱/硅基流动</string>
+</resources>
