@@ -30,10 +30,10 @@ jobs:
       - name: 生成 Gradle Wrapper
         run: |
           if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-            echo ">> Downloading Gradle 8.2..."
-            wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip -O /tmp/gradle.zip
+            echo ">> Downloading Gradle 8.9..."
+            wget -q https://services.gradle.org/distributions/gradle-8.9-bin.zip -O /tmp/gradle.zip
             unzip -q /tmp/gradle.zip -d /tmp/
-            /tmp/gradle-8.2/bin/gradle wrapper --gradle-version 8.2
+            /tmp/gradle-8.9/bin/gradle wrapper --gradle-version 8.9
           fi
 
       - name: 设置 Gradle 缓存
