@@ -11,6 +11,7 @@ import de.robv.android.xposed.XposedBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.luckypray.dexkit.DexKitBridge
@@ -336,7 +337,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
 
     // ===================== YukiHookAPI 入口 =====================
 
-    override fun onHook() {
+    override fun onHook() = encase {
         XposedBridge.log("$TAG: onHook() called")
 
         // 初始化 DexKit (从已缓存的 bridge 实例)
@@ -915,9 +916,9 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
                 // 查找是否已有该群的欢迎语, 有则更新, 无则新增
                 val existing = welcomes.find { it.chatroomId == wxId }
                 if (existing != null) {
-                    existing.welcomWord = safeCmdContent
+                    existing.welcomeWord = safeCmdContent
                 } else {
-                    welcomes.add(WxGroupWelcome(chatroomId = wxId, welcomWord = safeCmdContent))
+                    welcomes.add(WxGroupWelcome(chatroomId = wxId, welcomeWord = safeCmdContent))
                 }
                 ConfigManager.saveJson(ctx, ConfigManager.KEY_WELCOME, welcomes)
                 sendReply(wxId, "群 $wxId 欢迎语已设置为: $safeCmdContent")
@@ -927,8 +928,8 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
                     ctx, ConfigManager.KEY_WELCOME, mutableListOf()
                 )
                 val welcome = welcomes.find { it.chatroomId == wxId }
-                if (welcome != null && welcome.welcomWord.isNotBlank()) {
-                    sendReply(wxId, "本群欢迎语: ${welcome.welcomWord}")
+                if (welcome != null && welcome.welcomeWord.isNotBlank()) {
+                    sendReply(wxId, "本群欢迎语: ${welcome.welcomeWord}")
                 } else {
                     sendReply(wxId, "本群未设置欢迎语")
                 }
@@ -1476,40 +1477,49 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
                 }
                 // 状态回调
                 onGetStatus = {
-                    val ctx = appContext ?: return@apply mapOf("status" to "running")
-                    val provider = getCurrentAiProvider()
-                    mapOf(
-                        "status" to "running",
-                        "aiProvider" to (provider?.displayName ?: "未配置"),
-                        "model" to getCurrentModel().ifBlank { "default" },
-                        "sendCount" to ConfigManager.getInt(ctx, ConfigManager.KEY_SEND_COUNT, 0),
-                        "bindingCount" to ConfigManager.getStringSet(ctx, ConfigManager.KEY_WX_IDS).size
-                    )
+                    val ctx = appContext
+                    if (ctx == null) {
+                        mapOf("status" to "running")
+                    } else {
+                        val provider = getCurrentAiProvider()
+                        mapOf(
+                            "status" to "running",
+                            "aiProvider" to (provider?.displayName ?: "未配置"),
+                            "model" to getCurrentModel().ifBlank { "default" },
+                            "sendCount" to ConfigManager.getInt(ctx, ConfigManager.KEY_SEND_COUNT, 0),
+                            "bindingCount" to ConfigManager.getStringSet(ctx, ConfigManager.KEY_WX_IDS).size
+                        )
+                    }
                 }
                 // 绑定列表回调
                 onGetBindings = {
-                    val ctx = appContext ?: return@apply emptyList()
-                    ConfigManager.getStringSet(ctx, ConfigManager.KEY_WX_IDS).toList()
+                    val ctx = appContext
+                    if (ctx == null) emptyList()
+                    else ConfigManager.getStringSet(ctx, ConfigManager.KEY_WX_IDS).toList()
                 }
                 // 订阅列表回调
                 onGetSubscriptions = {
-                    val ctx = appContext ?: return@apply emptyList()
-                    val subscribes = ConfigManager.getJson<MutableList<WxSubcribeDTO>>(
-                        ctx, ConfigManager.KEY_SUBSCRIBE, mutableListOf()
-                    )
-                    subscribes.map { sub ->
-                        mapOf<String, Any>(
-                            "name" to sub.name,
-                            "url" to sub.url,
-                            "subscriberCount" to sub.wxIds.size,
-                            "wxIds" to sub.wxIds.toList()
+                    val ctx = appContext
+                    if (ctx == null) emptyList()
+                    else {
+                        val subscribes = ConfigManager.getJson<MutableList<WxSubcribeDTO>>(
+                            ctx, ConfigManager.KEY_SUBSCRIBE, mutableListOf()
                         )
+                        subscribes.map { sub ->
+                            mapOf<String, Any>(
+                                "name" to sub.name,
+                                "url" to sub.url,
+                                "subscriberCount" to sub.wxIds.size,
+                                "wxIds" to sub.wxIds.toList()
+                            )
+                        }
                     }
                 }
                 // 配置摘要回调
                 onGetConfig = {
-                    val ctx = appContext ?: return@apply emptyMap()
-                    ConfigManager.getConfigSummary(ctx)
+                    val ctx = appContext
+                    if (ctx == null) emptyMap()
+                    else ConfigManager.getConfigSummary(ctx)
                 }
             }
             val port = httpServer?.tryStart() ?: -1
@@ -1682,7 +1692,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
     private var cachedAiProvider: AiProvider? = null
     @Volatile
     private var cachedAiProviderTimestamp: Long = 0L
-    private const val AI_PROVIDER_CACHE_TTL_MS: Long = 30_000L // 30 秒
+    private val AI_PROVIDER_CACHE_TTL_MS: Long = 30_000L // 30 秒
 
     /**
      * 获取当前配置的 AI 厂商（带缓存）

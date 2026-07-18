@@ -80,7 +80,8 @@ object ConfigManager {
      * 共享的 Gson 实例，避免重复创建。
      * Gson 是线程安全的，可以跨线程复用。
      */
-    private val gson = Gson()
+    @PublishedApi
+    internal val gson = Gson()
 
     // ===================== 内存缓存 =====================
 
@@ -147,7 +148,8 @@ object ConfigManager {
         }
     }
 
-    private fun getSP(context: Context): android.content.SharedPreferences {
+    @PublishedApi
+    internal fun getSP(context: Context): android.content.SharedPreferences {
         // 确保迁移已执行
         if (!migrated) {
             migrateIfNeeded(context)
@@ -319,9 +321,9 @@ object ConfigManager {
             )
             for ((key, value) in raw) {
                 masked[key] = if (key in keyFields && value is String) {
-                    SecurityUtils.maskApiKey(value)
+                    SecurityUtils.maskApiKey(value as String)
                 } else {
-                    value
+                    value ?: ""
                 }
             }
             masked

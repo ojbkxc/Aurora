@@ -46,10 +46,8 @@ object SchedulerManager {
         val intervalMs: Long
     )
 
-    companion object {
-        /** 线程池大小 */
-        private const val THREAD_POOL_SIZE = 4
-    }
+    /** 线程池大小 */
+    private const val THREAD_POOL_SIZE = 4
 
     /** 调度器 ID 自增计数器 */
     private val idCounter = AtomicLong(0)

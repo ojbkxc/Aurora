@@ -1,6 +1,6 @@
 package cc.aurora.bot.hook
 
-import com.highcapable.yukihookapi.annotation.XposedInit
+import com.highcapable.yukihookapi.hook.xposed.annotation.XposedInit
 import com.highcapable.yukihookapi.hook.xposed.proxy.IYukiHookXposedInit
 import de.robv.android.xposed.XposedBridge
 import org.luckypray.dexkit.DexKitBridge
@@ -14,20 +14,20 @@ class HookEntry : IYukiHookXposedInit {
         private const val MAX_SCAN_DEPTH = 3
     }
 
-    override fun onHook() {
+    override fun onHook() = encase {
         // 加载微信进程的 hook 逻辑
-        loadAppHooker(WeChatHooker())
+        loadApp(name = "com.tencent.mm", hooker = WeChatHooker())
 
         // 初始化 DexKitBridge 从微信 APK 路径
         try {
-            val modulePath = startupParam?.modulePath
+            val modulePath = this.modulePath
             if (modulePath != null) {
                 val apkPath = modulePath
                 XposedBridge.log("AURORA: DexKit initializing from: $apkPath")
 
                 // 尝试初始化 DexKit
                 try {
-                    DexKitBridge.create(apkPath)?.let { bridge ->
+                    DexKitBridge.create(apkPath!!)?.let { bridge ->
                         XposedBridge.log("AURORA: DexKit initialized successfully")
                         // 将 bridge 传递给 WeChatHooker
                         WeChatHooker.setDexKitBridge(bridge)

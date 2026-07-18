@@ -6,7 +6,7 @@ import cc.aurora.bot.service.ai.AiMessage
 // 群欢迎语
 data class WxGroupWelcome(
     @SerializedName("chatroomId") val chatroomId: String = "",
-    @SerializedName("welcomWord") val welcomeWord: String = ""
+    @SerializedName("welcomWord") var welcomeWord: String = ""
 )
 
 // 订阅
@@ -14,7 +14,7 @@ data class WxGroupWelcome(
 // 为保持向后兼容性暂不重命名。
 data class WxSubcribeDTO(
     @SerializedName("name") val name: String = "",
-    @SerializedName("url") val url: String = "",
+    @SerializedName("url") var url: String = "",
     @SerializedName("wxIds") val wxIds: MutableSet<String> = mutableSetOf()
 )
 
@@ -28,7 +28,7 @@ data class ChatRoomInfoDTO(
 data class UserInfoDTO(
     @SerializedName("wxId") val wxId: String = "",
     @SerializedName("nickName") val nickName: String = "",
-    @SerializedName("userSubcribeDTO") val userSubcribeDTO: UserSubcribeDTO? = null
+    @SerializedName("userSubcribeDTO") var userSubcribeDTO: UserSubcribeDTO? = null
 )
 
 // 用户订阅关键词

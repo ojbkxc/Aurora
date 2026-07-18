@@ -70,7 +70,7 @@ object ConversationManager {
                 }
             }
 
-            val chatToEvict = lruChatId ?: conversationCache.keys().firstOrNull() ?: break
+            val chatToEvict = lruChatId ?: conversationCache.keys().asSequence().firstOrNull() ?: break
 
             // 移除该 chat 的所有消息
             val removed = conversationCache.remove(chatToEvict)
