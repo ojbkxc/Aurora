@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'PROMPT.md'
+      - '.gitignore'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Generate Gradle Wrapper
+        run: |
+          cd /tmp
+          mkdir -p gradle-gen && cd gradle-gen
+          echo 'rootProject.name = "temp"' > settings.gradle
+          gradle wrapper --gradle-version 8.9
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p gradle/wrapper
+          cp /tmp/gradle-gen/gradlew /tmp/gradle-gen/gradlew.bat .
+          cp /tmp/gradle-gen/gradle/wrapper/gradle-wrapper.jar /tmp/gradle-gen/gradle/wrapper/gradle-wrapper.properties gradle/wrapper/
+          chmod +x gradlew
+          rm -rf /tmp/gradle-gen
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Build Debug APK
+        run: ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aurora-debug
+          path: app/build/outputs/apk/debug/*.apk
