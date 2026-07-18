@@ -189,6 +189,54 @@ data class AppConfig(
     }
 
     /**
+     * 获取指定 AI 提供商的 API Key。
+     *
+     * @param provider AI 提供商
+     * @return API Key，未配置时返回空字符串
+     */
+    fun getApiKey(provider: AiProvider): String {
+        return when (provider) {
+            AiProvider.DEEPSEEK -> deepSeekKey
+            AiProvider.QWEN -> qwenKey
+            AiProvider.SILICON -> siliconKey
+            AiProvider.ZHIPU -> zhiPuKey
+            AiProvider.CUSTOM -> customKey
+        }
+    }
+
+    /**
+     * 获取指定 AI 提供商的模型名称。
+     * 如果未配置自定义模型，返回提供商的默认模型。
+     *
+     * @param provider AI 提供商
+     * @return 模型名称
+     */
+    fun getModel(provider: AiProvider): String {
+        val customModel = when (provider) {
+            AiProvider.DEEPSEEK -> deepSeekModel
+            AiProvider.QWEN -> qwenModel
+            AiProvider.SILICON -> siliconModel
+            AiProvider.ZHIPU -> zhiPuModel
+            AiProvider.CUSTOM -> customModel
+        }
+        return customModel.ifBlank { provider.defaultModel }
+    }
+
+    /**
+     * 获取指定 AI 提供商的 API 地址。
+     * 仅 CUSTOM 提供商返回自定义地址，其他返回默认地址。
+     *
+     * @param provider AI 提供商
+     * @return API 地址
+     */
+    fun getBaseUrl(provider: AiProvider): String {
+        return when (provider) {
+            AiProvider.CUSTOM -> customApiUrl.ifBlank { provider.defaultBaseUrl }
+            else -> provider.defaultBaseUrl
+        }
+    }
+
+    /**
      * 获取非敏感配置摘要（不含 API Key 完整值）。
      *
      * @return 配置摘要映射

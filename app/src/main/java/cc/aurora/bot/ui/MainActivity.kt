@@ -7,6 +7,7 @@ import android.view.ViewTreeObserver
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import cc.aurora.bot.model.AppConfig
 import cc.aurora.bot.service.ai.AiProvider
 import cc.aurora.bot.service.ai.AiService
 import cc.aurora.bot.service.ai.ConnectionResult
@@ -209,23 +210,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadConfig() {
         val ctx = this
+        val config = AppConfig.fromConfigManager(ctx)
 
-        etTriggerWord.setText(ConfigManager.getString(ctx, ConfigManager.KEY_TRIGGER_WORD, "机器人"))
-        etCacheTimes.setText(ConfigManager.getInt(ctx, ConfigManager.KEY_CACHE_TIMES, 10).toString())
-        etPrompt.setText(ConfigManager.getString(ctx, ConfigManager.KEY_PROMPT, "你是一个友好的微信AI助手，请用简洁自然的中文回复。"))
+        etTriggerWord.setText(config.triggerWord)
+        etCacheTimes.setText(config.cacheTimes.toString())
+        etPrompt.setText(config.systemPrompt)
 
-        etDeepSeekKey.setText(ConfigManager.getString(ctx, ConfigManager.KEY_DEEPSEEK_KEY))
-        etDeepSeekModel.setText(ConfigManager.getString(ctx, ConfigManager.KEY_DEEPSEEK_MODEL))
-        etQwenKey.setText(ConfigManager.getString(ctx, ConfigManager.KEY_QWEN_KEY))
-        etQwenModel.setText(ConfigManager.getString(ctx, ConfigManager.KEY_QWEN_MODEL))
-        etSiliconKey.setText(ConfigManager.getString(ctx, ConfigManager.KEY_SILICON_KEY))
-        etSiliconModel.setText(ConfigManager.getString(ctx, ConfigManager.KEY_SILICON_MODEL))
-        etZhiPuKey.setText(ConfigManager.getString(ctx, ConfigManager.KEY_ZHIPU_KEY))
-        etZhiPuModel.setText(ConfigManager.getString(ctx, ConfigManager.KEY_ZHIPU_MODEL))
+        etDeepSeekKey.setText(config.deepSeekKey)
+        etDeepSeekModel.setText(config.deepSeekModel)
+        etQwenKey.setText(config.qwenKey)
+        etQwenModel.setText(config.qwenModel)
+        etSiliconKey.setText(config.siliconKey)
+        etSiliconModel.setText(config.siliconModel)
+        etZhiPuKey.setText(config.zhiPuKey)
+        etZhiPuModel.setText(config.zhiPuModel)
 
-        etCustomApi.setText(ConfigManager.getString(ctx, ConfigManager.KEY_CUSTOM_API))
-        etCustomKey.setText(ConfigManager.getString(ctx, ConfigManager.KEY_CUSTOM_KEY))
-        etCustomModel.setText(ConfigManager.getString(ctx, ConfigManager.KEY_CUSTOM_MODEL))
+        etCustomApi.setText(config.customApiUrl)
+        etCustomKey.setText(config.customKey)
+        etCustomModel.setText(config.customModel)
 
         restoreScrollPosition()
         refreshStats()
@@ -234,23 +236,23 @@ class MainActivity : AppCompatActivity() {
     private fun saveConfig() {
         val ctx = this
 
-        // 消毒所有用户输入，防止注入攻击
-        ConfigManager.saveString(ctx, ConfigManager.KEY_TRIGGER_WORD, SecurityUtils.sanitizeInput(etTriggerWord.text.toString().trim(), 256))
-        ConfigManager.saveInt(ctx, ConfigManager.KEY_CACHE_TIMES, etCacheTimes.text.toString().trim().toIntOrNull() ?: 10)
-        ConfigManager.saveString(ctx, ConfigManager.KEY_PROMPT, SecurityUtils.sanitizeInput(etPrompt.text.toString().trim(), 5000))
-
-        ConfigManager.saveString(ctx, ConfigManager.KEY_DEEPSEEK_KEY, SecurityUtils.sanitizeInput(etDeepSeekKey.text.toString().trim(), 512))
-        ConfigManager.saveString(ctx, ConfigManager.KEY_DEEPSEEK_MODEL, SecurityUtils.sanitizeInput(etDeepSeekModel.text.toString().trim(), 256))
-        ConfigManager.saveString(ctx, ConfigManager.KEY_QWEN_KEY, SecurityUtils.sanitizeInput(etQwenKey.text.toString().trim(), 512))
-        ConfigManager.saveString(ctx, ConfigManager.KEY_QWEN_MODEL, SecurityUtils.sanitizeInput(etQwenModel.text.toString().trim(), 256))
-        ConfigManager.saveString(ctx, ConfigManager.KEY_SILICON_KEY, SecurityUtils.sanitizeInput(etSiliconKey.text.toString().trim(), 512))
-        ConfigManager.saveString(ctx, ConfigManager.KEY_SILICON_MODEL, SecurityUtils.sanitizeInput(etSiliconModel.text.toString().trim(), 256))
-        ConfigManager.saveString(ctx, ConfigManager.KEY_ZHIPU_KEY, SecurityUtils.sanitizeInput(etZhiPuKey.text.toString().trim(), 512))
-        ConfigManager.saveString(ctx, ConfigManager.KEY_ZHIPU_MODEL, SecurityUtils.sanitizeInput(etZhiPuModel.text.toString().trim(), 256))
-
-        ConfigManager.saveString(ctx, ConfigManager.KEY_CUSTOM_API, SecurityUtils.sanitizeInput(etCustomApi.text.toString().trim(), 2048))
-        ConfigManager.saveString(ctx, ConfigManager.KEY_CUSTOM_KEY, SecurityUtils.sanitizeInput(etCustomKey.text.toString().trim(), 512))
-        ConfigManager.saveString(ctx, ConfigManager.KEY_CUSTOM_MODEL, SecurityUtils.sanitizeInput(etCustomModel.text.toString().trim(), 256))
+        val config = AppConfig(
+            triggerWord = SecurityUtils.sanitizeInput(etTriggerWord.text.toString().trim(), 256),
+            cacheTimes = etCacheTimes.text.toString().trim().toIntOrNull() ?: 10,
+            systemPrompt = SecurityUtils.sanitizeInput(etPrompt.text.toString().trim(), 5000),
+            deepSeekKey = SecurityUtils.sanitizeInput(etDeepSeekKey.text.toString().trim(), 512),
+            deepSeekModel = SecurityUtils.sanitizeInput(etDeepSeekModel.text.toString().trim(), 256),
+            qwenKey = SecurityUtils.sanitizeInput(etQwenKey.text.toString().trim(), 512),
+            qwenModel = SecurityUtils.sanitizeInput(etQwenModel.text.toString().trim(), 256),
+            siliconKey = SecurityUtils.sanitizeInput(etSiliconKey.text.toString().trim(), 512),
+            siliconModel = SecurityUtils.sanitizeInput(etSiliconModel.text.toString().trim(), 256),
+            zhiPuKey = SecurityUtils.sanitizeInput(etZhiPuKey.text.toString().trim(), 512),
+            zhiPuModel = SecurityUtils.sanitizeInput(etZhiPuModel.text.toString().trim(), 256),
+            customApiUrl = SecurityUtils.sanitizeInput(etCustomApi.text.toString().trim(), 2048),
+            customKey = SecurityUtils.sanitizeInput(etCustomKey.text.toString().trim(), 512),
+            customModel = SecurityUtils.sanitizeInput(etCustomModel.text.toString().trim(), 256)
+        )
+        config.saveToConfigManager(ctx)
 
         Toast.makeText(this, "配置已保存 (需重启微信生效)", Toast.LENGTH_LONG).show()
     }
@@ -272,14 +274,15 @@ class MainActivity : AppCompatActivity() {
         val ctx = this
 
         // 收集所有已配置的提供商
+        val config = AppConfig.fromConfigManager(ctx)
         val providers = listOf(
-            TestProvider(AiProvider.DEEPSEEK, ConfigManager.KEY_DEEPSEEK_KEY, ConfigManager.KEY_DEEPSEEK_MODEL),
-            TestProvider(AiProvider.QWEN, ConfigManager.KEY_QWEN_KEY, ConfigManager.KEY_QWEN_MODEL),
-            TestProvider(AiProvider.SILICON, ConfigManager.KEY_SILICON_KEY, ConfigManager.KEY_SILICON_MODEL),
-            TestProvider(AiProvider.ZHIPU, ConfigManager.KEY_ZHIPU_KEY, ConfigManager.KEY_ZHIPU_MODEL),
-            TestProvider(AiProvider.CUSTOM, ConfigManager.KEY_CUSTOM_KEY, ConfigManager.KEY_CUSTOM_MODEL)
+            TestProvider(AiProvider.DEEPSEEK, config.deepSeekKey, config.deepSeekModel),
+            TestProvider(AiProvider.QWEN, config.qwenKey, config.qwenModel),
+            TestProvider(AiProvider.SILICON, config.siliconKey, config.siliconModel),
+            TestProvider(AiProvider.ZHIPU, config.zhiPuKey, config.zhiPuModel),
+            TestProvider(AiProvider.CUSTOM, config.customKey, config.customModel)
         ).filter { tp ->
-            ConfigManager.getString(ctx, tp.keyField).isNotBlank()
+            tp.key.isNotBlank()
         }
 
         if (providers.isEmpty()) {
@@ -305,10 +308,10 @@ class MainActivity : AppCompatActivity() {
 
             for (tp in providers) {
                 try {
-                    val apiKey = ConfigManager.getString(ctx, tp.keyField)
-                    val model = ConfigManager.getString(ctx, tp.modelField).ifBlank { tp.provider.defaultModel }
+                    val apiKey = tp.key
+                    val model = tp.model.ifBlank { tp.provider.defaultModel }
                     val customUrl = if (tp.provider == AiProvider.CUSTOM) {
-                        ConfigManager.getString(ctx, ConfigManager.KEY_CUSTOM_API)
+                        config.customApiUrl
                     } else null
 
                     val result = withContext(Dispatchers.IO) {
@@ -492,7 +495,7 @@ class MainActivity : AppCompatActivity() {
      */
     private data class TestProvider(
         val provider: AiProvider,
-        val keyField: String,
-        val modelField: String
+        val key: String,
+        val model: String
     )
 }

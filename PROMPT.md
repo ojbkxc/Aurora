@@ -12,7 +12,7 @@ Aurora 是一个基于 Xposed/LSPosed (YukiHookAPI) 框架的微信 AI 自动回
 
 ## 目标应用
 - **包名**: `com.tencent.mm` (微信)
-- **参考 APK**: `C:\GitHub\po\weixin_arm64.apk`
+- **参考 APK**: 微信 arm64 APK（需自行从手机提取或从官方渠道下载）
 - **架构**: 通过 YukiHookAPI 注入微信主进程
 
 ## 项目结构
@@ -29,7 +29,9 @@ Aurora/
 │       │   │   └── DefaultApplication.kt  # Application 初始化
 │       │   ├── hook/
 │       │   │   ├── HookEntry.kt           # Xposed 入口 (YukiHookAPI)
-│       │   │   └── WeChatHooker.kt        # 核心: 消息拦截+AI回复+指令+HTTP+定时器 (2031行)
+│       │   │   ├── WeChatHooker.kt        # 核心: 消息处理+AI回复+指令+HTTP+定时器
+│       │   │   ├── MessageReceiver.kt     # 消息接收: 五层Hook策略拦截微信消息
+│       │   │   └── MessageSender.kt       # 消息发送: 四种策略发送微信消息
 │       │   ├── service/
 │       │   │   ├── ai/AiService.kt        # AI 调用服务 (DeepSeek/通义千问/智谱/硅基流动/自定义)
 │       │   │   ├── command/CommandParser.kt  # 指令解析器 (30+ 种指令)
@@ -93,7 +95,6 @@ HookEntry (IYukiHookXposedInit)
 - 版本号变更需修改 `app/build.gradle.kts` 中的 `versionCode` 和 `versionName`
 - 新增 AI 厂商需在 `AiService.kt` 中添加对应的 API URL 和请求格式
 - 新增指令需在 `CommandParser.kt` 中添加解析逻辑，并在 `WeChatHooker.kt` 中添加处理分支
-- 修改 `WeChatHooker.kt` 时注意: 这是 2031 行的核心文件，所有 Hook 逻辑、定时器、HTTP 路由都在此文件中
-- ProGuard 混淆规则需 keep YukiHookAPI、Xposed API、Gson 序列化类、NanoHTTPD
-- Aurora 的 HTTP 服务器监听端口 5888，需确保不与其他服务冲突
-- 消息拦截采用三层策略: DexKit 动态查找 → 已知类路径尝试 → 字符串特征扫描
+- 修改 `WeChatHooker.kt` 时注意: 这是核心文件，所有 Hook 逻辑、定时器、HTTP 路由都在此文件中
+- 消息拦截采用五层策略: DexKit doRevokeMsg → DexKit 字段匹配 → 已知真实类名 → 已知路径模式 → 字符串特征枚举
+- 消息发送采用四种策略: 真实内部类 → DexKit 动态查找 → 已知路径 → 反射搜索

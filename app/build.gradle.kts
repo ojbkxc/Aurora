@@ -31,11 +31,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // 使用新的 compilerOptions API 替代已过时的 kotlinOptions
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.config.JvmTarget.JVM_17)
-        }
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
     packaging {

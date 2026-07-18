@@ -26,6 +26,7 @@ import cc.aurora.bot.service.http.HttpServer
 import cc.aurora.bot.service.scheduler.SchedulerManager
 import cc.aurora.bot.service.template.TemplateManager
 import cc.aurora.bot.service.wx.dto.ChatRoomInfoDTO
+import cc.aurora.bot.model.AppConfig
 import cc.aurora.bot.service.wx.dto.MultipleChat
 import cc.aurora.bot.service.wx.dto.UserInfoDTO
 import cc.aurora.bot.service.wx.dto.WxGroupWelcome
@@ -52,7 +53,6 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
         const val CACHE_FLUSH_INTERVAL: Long = 1_200_000L     // 20分钟
         const val REPORT_INTERVAL: Long = 7_200_000L         // 2小时
         const val MAX_HISTORY_MESSAGES: Int = 20
-        const val DEFAULT_TRIGGER_WORD: String = "机器人"
         const val DEFAULT_PROMPT: String = "你是一个友好的微信AI助手，请用简洁自然的中文回复。"
         const val MAX_DEDUP_IDS: Int = 100
 
@@ -597,7 +597,8 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
         // 检查 wxId 是否是已绑定的群聊或好友
         if (boundIds.contains(wxId)) {
             // 检查触发词
-            val triggerWord = ConfigManager.getString(ctx, ConfigManager.KEY_TRIGGER_WORD, DEFAULT_TRIGGER_WORD)
+            val config = AppConfig.fromConfigManager(ctx)
+            val triggerWord = config.triggerWord
             if (triggerWord.isBlank() || content.contains(triggerWord)) {
                 callAI(wxId, content, null)
                 return
@@ -1052,17 +1053,16 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
 
             // ===== 机器人信息 =====
             CommandType.BOT_INFO -> {
-                val provider = getCurrentAiProvider()
-                val model = getCurrentModel()
-                val triggerWord = ConfigManager.getString(ctx, ConfigManager.KEY_TRIGGER_WORD, DEFAULT_TRIGGER_WORD)
+                val config = AppConfig.fromConfigManager(ctx)
+                val triggerWord = config.triggerWord
                 val boundIds = ConfigManager.getStringSet(ctx, ConfigManager.KEY_WX_IDS)
                 val devIdsSet = ConfigManager.getStringSet(ctx, ConfigManager.KEY_DEV_WX_IDS)
                 val sendCount = ConfigManager.getInt(ctx, ConfigManager.KEY_SEND_COUNT, 0)
 
                 val info = StringBuilder()
                 info.append("=== Aurora 机器人信息 ===\n")
-                info.append("AI厂商: ${provider?.displayName ?: "未配置"}\n")
-                info.append("模型: ${model.ifBlank { "默认" }}\n")
+                info.append("AI厂商: ${config.getActiveAiProvider()?.displayName ?: "未配置"}\n")
+                info.append("模型: ${config.getModel(config.getActiveAiProvider() ?: AiProvider.DEEPSEEK).ifBlank { "默认" }}\n")
                 info.append("触发词: $triggerWord\n")
                 info.append("绑定数量: ${boundIds.size}\n")
                 info.append("开发者数量: ${devIdsSet.size}\n")
@@ -1698,16 +1698,9 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
 
         val ctx = appContext ?: return null
 
-        // 按优先级检查: DeepSeek > Qwen > Silicon > Zhipu > Custom
-        val result = when {
-            ConfigManager.getString(ctx, ConfigManager.KEY_DEEPSEEK_KEY).isNotBlank() -> AiProvider.DEEPSEEK
-            ConfigManager.getString(ctx, ConfigManager.KEY_QWEN_KEY).isNotBlank() -> AiProvider.QWEN
-            ConfigManager.getString(ctx, ConfigManager.KEY_SILICON_KEY).isNotBlank() -> AiProvider.SILICON
-            ConfigManager.getString(ctx, ConfigManager.KEY_ZHIPU_KEY).isNotBlank() -> AiProvider.ZHIPU
-            ConfigManager.getString(ctx, ConfigManager.KEY_CUSTOM_KEY).isNotBlank() &&
-                ConfigManager.getString(ctx, ConfigManager.KEY_CUSTOM_API).isNotBlank() -> AiProvider.CUSTOM
-            else -> null
-        }
+        // 使用 AppConfig 模型统一获取
+        val config = AppConfig.fromConfigManager(ctx)
+        val result = config.getActiveAiProvider()
 
         cachedAiProvider = result
         cachedAiProviderTimestamp = now
@@ -1725,13 +1718,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
     private fun getCurrentAiKey(): String {
         val ctx = appContext ?: return ""
         val provider = getCurrentAiProvider() ?: return ""
-        return when (provider) {
-            AiProvider.DEEPSEEK -> ConfigManager.getString(ctx, ConfigManager.KEY_DEEPSEEK_KEY)
-            AiProvider.QWEN -> ConfigManager.getString(ctx, ConfigManager.KEY_QWEN_KEY)
-            AiProvider.ZHIPU -> ConfigManager.getString(ctx, ConfigManager.KEY_ZHIPU_KEY)
-            AiProvider.SILICON -> ConfigManager.getString(ctx, ConfigManager.KEY_SILICON_KEY)
-            AiProvider.CUSTOM -> ConfigManager.getString(ctx, ConfigManager.KEY_CUSTOM_KEY)
-        }
+        return AppConfig.fromConfigManager(ctx).getApiKey(provider)
     }
 
     /**
@@ -1740,23 +1727,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
     private fun getCurrentModel(): String {
         val ctx = appContext ?: return ""
         val provider = getCurrentAiProvider() ?: return ""
-        return when (provider) {
-            AiProvider.DEEPSEEK -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_DEEPSEEK_MODEL, AiProvider.DEEPSEEK.defaultModel
-            )
-            AiProvider.QWEN -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_QWEN_MODEL, AiProvider.QWEN.defaultModel
-            )
-            AiProvider.ZHIPU -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_ZHIPU_MODEL, AiProvider.ZHIPU.defaultModel
-            )
-            AiProvider.SILICON -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_SILICON_MODEL, AiProvider.SILICON.defaultModel
-            )
-            AiProvider.CUSTOM -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_CUSTOM_MODEL, "gpt-3.5-turbo"
-            )
-        }
+        return AppConfig.fromConfigManager(ctx).getModel(provider)
     }
 
     /**
@@ -1764,13 +1735,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
      */
     private fun getAiKeyForProvider(provider: AiProvider): String {
         val ctx = appContext ?: return ""
-        return when (provider) {
-            AiProvider.DEEPSEEK -> ConfigManager.getString(ctx, ConfigManager.KEY_DEEPSEEK_KEY)
-            AiProvider.QWEN -> ConfigManager.getString(ctx, ConfigManager.KEY_QWEN_KEY)
-            AiProvider.ZHIPU -> ConfigManager.getString(ctx, ConfigManager.KEY_ZHIPU_KEY)
-            AiProvider.SILICON -> ConfigManager.getString(ctx, ConfigManager.KEY_SILICON_KEY)
-            AiProvider.CUSTOM -> ConfigManager.getString(ctx, ConfigManager.KEY_CUSTOM_KEY)
-        }
+        return AppConfig.fromConfigManager(ctx).getApiKey(provider)
     }
 
     /**
@@ -1778,23 +1743,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
      */
     private fun getModelForProvider(provider: AiProvider): String {
         val ctx = appContext ?: return provider.defaultModel
-        return when (provider) {
-            AiProvider.DEEPSEEK -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_DEEPSEEK_MODEL, provider.defaultModel
-            )
-            AiProvider.QWEN -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_QWEN_MODEL, provider.defaultModel
-            )
-            AiProvider.ZHIPU -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_ZHIPU_MODEL, provider.defaultModel
-            )
-            AiProvider.SILICON -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_SILICON_MODEL, provider.defaultModel
-            )
-            AiProvider.CUSTOM -> ConfigManager.getString(
-                ctx, ConfigManager.KEY_CUSTOM_MODEL, provider.defaultModel
-            )
-        }
+        return AppConfig.fromConfigManager(ctx).getModel(provider)
     }
 
     /**
@@ -1819,7 +1768,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
         }
 
         // 返回全局默认 prompt
-        return ConfigManager.getString(ctx, ConfigManager.KEY_PROMPT, DEFAULT_PROMPT)
+        return AppConfig.fromConfigManager(ctx).systemPrompt
     }
 
     /**
@@ -1880,7 +1829,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
 
         // 计算输入指纹：系统提示词 + 历史消息 + 用户消息 + 缓存轮数
         val systemPrompt = getSystemPrompt(wxId)
-        val cacheTimes = ConfigManager.getInt(ctx, ConfigManager.KEY_CACHE_TIMES, 10)
+        val cacheTimes = AppConfig.fromConfigManager(ctx).cacheTimes
         val history = chatCache[wxId]
         val historySize = history?.size ?: 0
         val historyHash = history?.hashCode() ?: 0
@@ -1923,7 +1872,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
      */
     private fun updateChatCache(wxId: String, messages: List<AiMessage>) {
         val ctx = appContext ?: return
-        val cacheTimes = ConfigManager.getInt(ctx, ConfigManager.KEY_CACHE_TIMES, 10)
+        val cacheTimes = AppConfig.fromConfigManager(ctx).cacheTimes
         // 过滤掉 system 消息，只保留 user 和 assistant 的对话历史
         val conversationMessages = messages.filter { it.role != "system" }
         // 截断到 cacheTimes 轮对话 (每轮 user + assistant = 2 条)
@@ -2085,13 +2034,8 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
         // 检查4: AI Key 是否已配置
         val aiKeyConfigured = try {
             if (ctx != null) {
-                val deepseekKey = ConfigManager.getString(ctx, ConfigManager.KEY_DEEPSEEK_KEY)
-                val qwenKey = ConfigManager.getString(ctx, ConfigManager.KEY_QWEN_KEY)
-                val siliconKey = ConfigManager.getString(ctx, ConfigManager.KEY_SILICON_KEY)
-                val zhipuKey = ConfigManager.getString(ctx, ConfigManager.KEY_ZHIPU_KEY)
-                val customKey = ConfigManager.getString(ctx, ConfigManager.KEY_CUSTOM_KEY)
-                deepseekKey.isNotBlank() || qwenKey.isNotBlank() || siliconKey.isNotBlank() ||
-                    zhipuKey.isNotBlank() || customKey.isNotBlank()
+                val config = AppConfig.fromConfigManager(ctx)
+                config.hasAnyProviderConfigured()
             } else {
                 false
             }
@@ -2142,7 +2086,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
         XposedBridge.log("$TAG: Aurora module initialized successfully!")
         XposedBridge.log("$TAG:   DexKit: ${if (dexKitBridge != null) "active" else "inactive"}")
         XposedBridge.log("$TAG:   HTTP Server: ${if (httpServer?.isAlive == true) "running on port ${HttpServer.actualPort}" else "stopped"}")
-        XposedBridge.log("$TAG:   Message Interceptor: ${if (msgReceiveClass != null) "hooked" else "pending"}")
+        XposedBridge.log("$TAG:   Message Interceptor: ${if (MessageReceiver.getReceiveClass() != null) "hooked" else "pending"}")
         XposedBridge.log("$TAG:   AI Provider: ${getCurrentAiProvider()?.displayName ?: "not configured"}")
         XposedBridge.log("$TAG: ========================================")
     }
