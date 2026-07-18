@@ -6,7 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import com.highcapable.yukihookapi.hook.factory.classOf
 import com.highcapable.yukihookapi.hook.factory.method
-import com.highcapable.yukihookapi.hook.xposed.proxy.IYukiHookXposedInit
+import com.highcapable.yukihookapi.hook.entity.YukiBaseHooker
 import de.robv.android.xposed.XposedBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +44,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
-class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
+class WeChatHooker : YukiBaseHooker(), ModuleLifecycle {
 
     companion object {
         const val TAG: String = "Aurora"
@@ -337,7 +337,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
 
     // ===================== YukiHookAPI 入口 =====================
 
-    override fun onHook() = encase {
+    override fun onHook() {
         XposedBridge.log("$TAG: onHook() called")
 
         // 初始化 DexKit (从已缓存的 bridge 实例)
@@ -349,7 +349,7 @@ class WeChatHooker : IYukiHookXposedInit, ModuleLifecycle {
             emptyParam()
         }.hook {
             after {
-                val app = this.instance as? Application ?: return@after
+                val app = instance as? Application ?: return@after
                 appContext = app
                 onApplicationAttached(app)
             }
