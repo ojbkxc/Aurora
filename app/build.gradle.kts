@@ -35,6 +35,11 @@ android {
         jvmTarget = "17"
     }
 
+    buildFeatures {
+        // YukiHookAPI KSP requires BuildConfig to identify module package name
+        buildConfig = true
+    }
+
     packaging {
         resources {
             excludes += setOf(
